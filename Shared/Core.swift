@@ -15,15 +15,16 @@ struct HardTask: Identifiable, Hashable {
     let title: String
     let short: String
     let icon: String
+    let phrase: String   // how a sentence names it, like "your outdoor workout"
 
     static let all: [HardTask] = [
-        .init(id: "workout", title: "45 minute workout", short: "Workout", icon: "figure.strengthtraining.traditional"),
-        .init(id: "outdoor", title: "45 minute outdoor workout", short: "Outdoor workout", icon: "sun.max.fill"),
-        .init(id: "bible", title: "Read the Bible", short: "Bible", icon: "book.closed.fill"),
-        .init(id: "reading", title: "Read 10 pages", short: "Reading", icon: "books.vertical.fill"),
-        .init(id: "water", title: "Drink one gallon of water", short: "Water", icon: "drop.fill"),
-        .init(id: "diet", title: "Follow your diet", short: "Diet", icon: "fork.knife"),
-        .init(id: "clean", title: "No cheat meals or alcohol", short: "No cheats", icon: "nosign"),
+        .init(id: "workout", title: "45 minute workout", short: "Workout", icon: "figure.strengthtraining.traditional", phrase: "your workout"),
+        .init(id: "outdoor", title: "45 minute outdoor workout", short: "Outdoor workout", icon: "sun.max.fill", phrase: "your outdoor workout"),
+        .init(id: "bible", title: "Read the Bible", short: "Bible", icon: "book.closed.fill", phrase: "your Bible reading"),
+        .init(id: "reading", title: "Read 10 pages", short: "Reading", icon: "books.vertical.fill", phrase: "your 10 pages"),
+        .init(id: "water", title: "Drink one gallon of water", short: "Water", icon: "drop.fill", phrase: "your gallon of water"),
+        .init(id: "diet", title: "Follow your diet", short: "Diet", icon: "fork.knife", phrase: "your diet"),
+        .init(id: "clean", title: "No cheat meals or alcohol", short: "No cheats", icon: "nosign", phrase: "no cheat meals or alcohol"),
     ]
 }
 
@@ -59,17 +60,22 @@ struct AppSettings: Codable, Equatable {
     var dayEnd = 23 * 60 + 59
     var notifications = true
     var reminders: [String: Reminder] = AppSettings.defaultReminders
-    var nudges: [Int] = [18 * 60, 22 * 60, 23 * 60 + 15]
+    var nudges: [Int] = AppSettings.defaultNudges
+    var version = AppSettings.currentVersion
 
+    /// Task reminders start empty; the user turns on the ones they want.
     static let defaultReminders: [String: Reminder] = [
-        "workout": .init(on: true, minutes: 8 * 60),
-        "outdoor": .init(on: true, minutes: 10 * 60),
+        "workout": .init(on: false, minutes: 8 * 60),
+        "outdoor": .init(on: false, minutes: 10 * 60),
         "bible": .init(on: false, minutes: 7 * 60),
         "reading": .init(on: false, minutes: 21 * 60),
         "water": .init(on: false, minutes: 13 * 60),
         "diet": .init(on: false, minutes: 12 * 60),
         "clean": .init(on: false, minutes: 19 * 60),
     ]
+    /// One morning, one afternoon, one night.
+    static let defaultNudges = [9 * 60, 15 * 60, 23 * 60]
+    static let currentVersion = 2
 
     init() {}
     // Tolerant decoding so a new setting never wipes the old ones.
@@ -82,6 +88,13 @@ struct AppSettings: Codable, Equatable {
         notifications = (try? c.decodeIfPresent(Bool.self, forKey: .notifications)) ?? base.notifications
         reminders = (try? c.decodeIfPresent([String: Reminder].self, forKey: .reminders)) ?? base.reminders
         nudges = (try? c.decodeIfPresent([Int].self, forKey: .nudges)) ?? base.nudges
+        version = (try? c.decodeIfPresent(Int.self, forKey: .version)) ?? 1
+        // Build 1 shipped with two task reminders on and three evening nudges. Reset those once.
+        if version < 2 {
+            reminders = AppSettings.defaultReminders
+            nudges = AppSettings.defaultNudges
+            version = AppSettings.currentVersion
+        }
     }
 }
 
@@ -175,6 +188,12 @@ enum DayMath {
         return dayEnd < 12 * 60 ? tomorrow.addingTimeInterval(Double(dayEnd + 1) * 60) : tomorrow
     }
 
+    /// When the given logical day ends.
+    static func dayEndDate(for day: Date, dayEnd: Int) -> Date {
+        let next = dayEnd < 12 * 60 ? Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day : day
+        return next.addingTimeInterval(Double(dayEnd + 1) * 60)
+    }
+
     static func time(_ minutes: Int) -> String {
         var c = DateComponents(); c.hour = minutes / 60; c.minute = minutes % 60
         return (Calendar.current.date(from: c) ?? .now).formatted(date: .omitted, time: .shortened)
@@ -235,8 +254,6 @@ enum Phrases {
         "clean": ["No cheat meals. No alcohol. No exceptions 🚫", "Say no to the cheat meal 🙅", "Stay clean today 🧊", "Future you says thanks for skipping it 🚫🍺", "Hold the line 🛡️"],
     ]
 
-    static let nudge = ["You still have {n} left today ⏳", "{n} to go. Finish strong 🔥", "Day {d} is not done yet. {n} left 👀", "Do not break the streak. {n} left ⚠️", "Almost there. {n} left 💪"]
-    static let lastCall = ["Last call ⏰ {n} left before the day ends.", "Final warning 🚨 {n} left on day {d}.", "Clock is running out ⏳ {n} left.", "Do not let day {d} slip away. {n} left 🔥"]
     static let done = ["One more down.", "Keep stacking.", "That is how it is done.", "Discipline looks good on you.", "Nice work.", "Check.", "Easy. Next."]
     static let complete = ["Day {d} is in the books.", "Seven for seven.", "Another day stacked.", "You kept your word today.", "Nothing left on the list. Rest up."]
 
@@ -257,7 +274,6 @@ enum Reminders {
         let now = Date.now
         let cal = Calendar.current
         let today = DayMath.logicalToday(now, dayEnd: s.settings.dayEnd)
-        let lastNudge = s.settings.nudges.max()
 
         for offset in 0..<5 {
             guard let day = cal.date(byAdding: .day, value: offset, to: today) else { continue }
@@ -277,12 +293,17 @@ enum Reminders {
                 add(center, id: "task.\(task.id).\(n)", title: task.title, body: Phrases.reminder[task.id]?.randomElement() ?? task.title, at: at, day: n)
             }
 
-            let left = HardTask.all.count - record.count
-            guard left > 0 else { continue }
-            for m in s.settings.nudges {
+            var congratulated = false
+            for m in s.settings.nudges.sorted() {
                 guard let at = fire(m) else { continue }
-                let pool = m == lastNudge ? Phrases.lastCall : Phrases.nudge
-                add(center, id: "nudge.\(m).\(n)", title: "Day \(n)", body: Phrases.fill(pool.randomElement()!, n: left, d: n), at: at, day: n)
+                if record.complete {
+                    // One pat on the back at the next nudge, then quiet until tomorrow.
+                    guard !congratulated else { continue }
+                    congratulated = true
+                }
+                let hoursLeft = max(0, Int(DayMath.dayEndDate(for: day, dayEnd: s.settings.dayEnd).timeIntervalSince(at) / 3600))
+                let text = Nudges.text(minutes: m, record: record, day: n, hoursLeft: hoursLeft)
+                add(center, id: "nudge.\(m).\(n)", title: text.title, body: text.body, at: at, day: n)
             }
         }
     }
@@ -295,5 +316,114 @@ enum Reminders {
         content.threadIdentifier = "day\(day)"
         let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: at)
         center.add(UNNotificationRequest(identifier: id, content: content, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)))
+    }
+}
+
+// MARK: - Nudge words
+
+enum DayPart {
+    case morning, afternoon, evening, night
+
+    init(minutes m: Int) {
+        switch m {
+        case 4 * 60 ..< 12 * 60: self = .morning
+        case 12 * 60 ..< 17 * 60: self = .afternoon
+        case 17 * 60 ..< 21 * 60: self = .evening
+        default: self = .night
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .morning: "sunrise.fill"
+        case .afternoon: "sun.max.fill"
+        case .evening: "sunset.fill"
+        case .night: "moon.stars.fill"
+        }
+    }
+
+    var name: String {
+        switch self {
+        case .morning: "Morning"
+        case .afternoon: "Afternoon"
+        case .evening: "Evening"
+        case .night: "Night"
+        }
+    }
+}
+
+/// End of day nudges written from the time of day and what is already checked off.
+enum Nudges {
+    static func list(_ items: [String]) -> String {
+        switch items.count {
+        case 0: return ""
+        case 1: return items[0]
+        case 2: return "\(items[0]) and \(items[1])"
+        default: return items.dropLast().joined(separator: ", ") + ", and " + items.last!
+        }
+    }
+
+    static func text(minutes: Int, record: DayRecord, day: Int, hoursLeft: Int) -> (title: String, body: String) {
+        let part = DayPart(minutes: minutes)
+        let left = HardTask.all.filter { !record.done.contains($0.id) }
+        let done = HardTask.all.filter { record.done.contains($0.id) }
+        let leftText = list(left.map(\.phrase))
+        let doneText = list(done.map(\.phrase))
+        let k = done.count
+        let n = left.count
+        let first = left.first?.phrase ?? ""
+        let hours = hoursLeft <= 1 ? "about an hour" : "\(hoursLeft) hours"
+        let title = "Day \(day)"
+
+        if n == 0 {
+            return (title, [
+                "All seven done. Great job, see you tomorrow ✅",
+                "Day \(day) is in the books. Rest up, see you tomorrow 💪",
+                "Nothing left on the list. That is how it is done 🔥",
+            ].randomElement()!)
+        }
+
+        let pool: [String]
+        switch part {
+        case .morning:
+            pool = k == 0 ? [
+                "Good morning ☀️ Day \(day) starts now. Seven to go, let's get started.",
+                "Rise and grind ☀️ Nothing checked yet. Start with \(first).",
+                "Good morning. Clean slate today, all seven waiting. Let's go 💪",
+            ] : [
+                "Good morning ☀️ You already have \(k) done. Keep it going.",
+                "Early start 🔥 \(doneText) done already. \(n) to go.",
+                "Good morning. \(k) down, \(n) to go. Next up: \(first).",
+            ]
+        case .afternoon:
+            var p = k == 0 ? [
+                "Half the day is gone and nothing is checked yet ⏳ Start with \(first).",
+                "Afternoon check in. All seven still open. Time to move 🏃",
+            ] : [
+                "Afternoon check in ☀️ \(doneText) done. Still left: \(leftText).",
+                "Nice work so far. \(k) done, \(n) to go. Next: \(first).",
+                "Good pace 👊 Still need \(leftText).",
+            ]
+            if left.contains(where: { $0.id == "diet" }) { p.append("Lunch time 🥗 Stick to your diet. Still left: \(leftText).") }
+            if left.contains(where: { $0.id == "water" }) { p.append("Refill that bottle 💧 Still left: \(leftText).") }
+            pool = p
+        case .evening:
+            pool = n <= 2 ? [
+                "Almost there 🔥 Just \(leftText) left.",
+                "So close. Finish \(leftText) and day \(day) is done 💪",
+            ] : [
+                "Evening check in 🌆 \(n) left: \(leftText).",
+                "Knock these out before it gets late: \(leftText) ⏳",
+                "\(k) done, \(n) to go. Get \(first) out of the way next.",
+            ]
+        case .night:
+            pool = [
+                "It's getting late 🌙 Only \(hours) left and you still need \(leftText).",
+                "Really? \(hours) left and \(n) still open 👀 \(leftText.prefix(1).uppercased() + leftText.dropFirst()).",
+                "Last call ⏰ Finish \(leftText) before day \(day) ends.",
+                "Do not let day \(day) slip away 🚨 Still need \(leftText).",
+            ]
+        }
+        return (title, pool.randomElement()!)
     }
 }

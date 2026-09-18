@@ -15,6 +15,7 @@ struct HomeView: View {
         let person = model.shown
         let day = person.currentDay(dayEnd: model.dayEnd, now: model.now)
         let record = person.day(day)
+        let waiting = max(0, 1 - person.today(dayEnd: model.dayEnd, now: model.now))
 
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -23,6 +24,18 @@ struct HomeView: View {
                     .padding(.top, 18)
 
                 VStack(alignment: .leading, spacing: 4) {
+                    if waiting > 0 {
+                        Text(waiting == 1 ? "1 DAY" : "\(waiting) DAYS")
+                            .font(.system(size: 92, weight: .black))
+                            .italic()
+                            .fontWidth(.condensed)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .contentTransition(.numericText())
+                        Text("until day one, \(person.date(1).formatted(.dateTime.weekday(.wide).month(.wide).day()))")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Theme.muted)
+                    } else {
                     HStack(alignment: .lastTextBaseline, spacing: 10) {
                         Text("DAY \(day)")
                             .font(.system(size: 92, weight: .black))
@@ -38,6 +51,7 @@ struct HomeView: View {
                     Text(person.date(day).formatted(.dateTime.weekday(.wide).month(.wide).day()))
                         .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(Theme.muted)
+                    }
                 }
                 .padding(.top, 20)
                 .id(person.isMe)
@@ -45,21 +59,35 @@ struct HomeView: View {
 
                 if person.isMe { missedBanner.padding(.top, 18) }
 
-                ProgressStrip(count: record.count)
-                    .padding(.top, 22)
-                    .padding(.bottom, 14)
-
-                VStack(spacing: 10) {
-                    ForEach(HardTask.all) { task in
-                        TaskRow(task: task, done: record.done.contains(task.id), editable: person.isMe) {
-                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { model.toggle(task, day: day) }
+                if waiting > 0 {
+                    Text("Your seven every day")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.muted)
+                        .padding(.top, 28)
+                        .padding(.bottom, 12)
+                    VStack(spacing: 10) {
+                        ForEach(HardTask.all) { task in
+                            TaskRow(task: task, done: false, editable: false) {}
                         }
                     }
-                    PhotoRow(person: person, day: day)
-                }
+                    .opacity(0.55)
+                } else {
+                    ProgressStrip(count: record.count)
+                        .padding(.top, 22)
+                        .padding(.bottom, 14)
 
-                NoteCard(person: person, day: day)
-                    .padding(.top, 22)
+                    VStack(spacing: 10) {
+                        ForEach(HardTask.all) { task in
+                            TaskRow(task: task, done: record.done.contains(task.id), editable: person.isMe) {
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { model.toggle(task, day: day) }
+                            }
+                        }
+                        PhotoRow(person: person, day: day)
+                    }
+
+                    NoteCard(person: person, day: day)
+                        .padding(.top, 22)
+                }
 
                 Color.clear.frame(height: 110)
             }
@@ -71,6 +99,7 @@ struct HomeView: View {
         .refreshable { await model.refresh() }
         .overlay(alignment: .top) { ToastView() }
         .overlay(alignment: .bottomTrailing) {
+            if waiting == 0 {
             Button { sheet = .shareDay } label: {
                 Image(systemName: "square.and.arrow.up")
                     .font(.system(size: 20, weight: .bold))
@@ -83,6 +112,7 @@ struct HomeView: View {
             .accessibilityLabel("Share today")
             .padding(.trailing, 22)
             .padding(.bottom, 12)
+            }
         }
         .overlay {
             if let d = model.celebrateDay {

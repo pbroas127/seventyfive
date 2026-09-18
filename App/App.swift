@@ -339,7 +339,20 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 0) {
             LogoMark(size: 34, accent: model.accent)
                 .padding(.top, 24)
-            Spacer()
+            if !model.s.signedIn {
+                Color.clear
+                    .overlay {
+                        Image("Welcome")
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).strokeBorder(Theme.line))
+                    .padding(.vertical, 24)
+                    .accessibilityHidden(true)
+            } else {
+                Spacer()
+            }
             if !model.s.signedIn {
                 welcome
             } else {
@@ -403,12 +416,12 @@ struct OnboardingView: View {
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("Day one").font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
-                DatePicker("Day one", selection: $start, in: ...Date.now, displayedComponents: .date)
+                DatePicker("Day one", selection: $start, displayedComponents: .date)
                     .labelsHidden()
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Text("Already started? Pick the day you began.").font(.system(size: 13)).foregroundStyle(Theme.muted)
+                Text("Start today, pick a day coming up, or the day you already began.").font(.system(size: 13)).foregroundStyle(Theme.muted)
             }
             Button {
                 model.update { $0.firstName = name.trimmingCharacters(in: .whitespaces); $0.profileDirty = true }

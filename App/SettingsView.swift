@@ -124,7 +124,7 @@ struct SettingsView: View {
         } header: {
             Text("Reminders")
         } footer: {
-            Text("Reminders skip anything you already checked off.")
+            Text("Turn on a reminder for any task you want. They skip anything already checked off.")
         }
         .animation(.smooth, value: model.s.settings.notifications)
     }
@@ -134,7 +134,7 @@ struct SettingsView: View {
             DatePicker("Day one", selection: Binding(
                 get: { DayMath.date(model.s.startKey) ?? .now },
                 set: { d in model.update { $0.startKey = DayMath.key(d); $0.profileDirty = true } }
-            ), in: ...Date.now, displayedComponents: .date)
+            ), displayedComponents: .date)
             DatePicker("Day ends at", selection: minutes(\.settings.dayEnd), displayedComponents: .hourAndMinute)
             Button("Start a new attempt", role: .destructive) { confirmRestart = true }
         } header: {
@@ -237,8 +237,15 @@ private struct NudgeSection: View {
     var body: some View {
             Section {
                 ForEach(Array(model.s.settings.nudges.enumerated()), id: \.offset) { i, m in
-                    HStack {
-                        Text("Nudge \(i + 1)")
+                    let part = DayPart(minutes: m)
+                    HStack(spacing: 12) {
+                        Image(systemName: part.icon)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(model.accent.color)
+                            .frame(width: 22)
+                            .contentTransition(.symbolEffect(.replace))
+                        Text(part.name)
+                            .contentTransition(.opacity)
                         Spacer()
                         DatePicker("", selection: Binding(
                             get: { Calendar.current.startOfDay(for: .now).addingTimeInterval(Double(m) * 60) },
@@ -261,7 +268,7 @@ private struct NudgeSection: View {
             } header: {
                 Text("End of day nudges")
             } footer: {
-                Text("Only sent if something is still unchecked. The last one is the final warning.")
+                Text("Each nudge is written from the time of day and what you still have left. Once all seven are done, you get one last note and then quiet.")
             }
     }
 }

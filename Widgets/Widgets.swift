@@ -9,6 +9,7 @@ struct HardEntry: TimelineEntry {
     var record: DayRecord { state.day(day) }
     var accent: Accent { Accent.from(state) }
     var ready: Bool { state.signedIn && !state.startKey.isEmpty }
+    var waiting: Int { max(0, 1 - DayMath.number(startKey: state.startKey, now: date, dayEnd: state.settings.dayEnd)) }
 }
 
 struct HardProvider: TimelineProvider {
@@ -38,7 +39,19 @@ struct HardWidgetView: View {
 
     var body: some View {
         Group {
-            if !entry.ready {
+            if entry.ready && entry.waiting > 0 {
+                VStack(alignment: .leading, spacing: 2) {
+                    if family != .accessoryRectangular && family != .accessoryCircular {
+                        LogoMark(size: 18, accent: entry.accent, word: false)
+                        Spacer()
+                    }
+                    Text(entry.waiting == 1 ? "1 DAY" : "\(entry.waiting) DAYS")
+                        .font(.system(size: family == .accessoryCircular ? 16 : 34, weight: .black)).italic().fontWidth(.condensed)
+                        .minimumScaleFactor(0.5)
+                    Text("until day one").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.muted)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            } else if !entry.ready {
                 VStack(alignment: .leading, spacing: 8) {
                     LogoMark(size: 22, accent: entry.accent)
                     Spacer()
