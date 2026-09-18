@@ -1,0 +1,98 @@
+name: SeventyFive
+options:
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+    DEVELOPMENT_TEAM: GN2K85HBR8
+    TARGETED_DEVICE_FAMILY: 1
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: Apple Distribution
+targets:
+  SeventyFive:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    entitlements:
+      path: App/SeventyFive.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.peterbroas.seventyfive
+        com.apple.developer.applesignin: [Default]
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.peterbroas.seventyfive
+        com.apple.developer.icloud-services: [CloudKit]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.peterbroas.seventyfive
+        PROVISIONING_PROFILE_SPECIFIER: match AppStore com.peterbroas.seventyfive
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Distribution
+        DEVELOPMENT_TEAM: GN2K85HBR8
+        TARGETED_DEVICE_FAMILY: 1
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: 75 Hard
+        CFBundleName: 75 Hard
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: com.peterbroas.seventyfive
+            CFBundleURLSchemes: [seventyfive]
+        NSCameraUsageDescription: Take a progress picture for today.
+        NSPhotoLibraryAddUsageDescription: Save progress pictures and share images to your photos.
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    dependencies:
+      - target: SeventyFiveWidgets
+        embed: true
+
+  SeventyFiveWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Widgets
+      - Shared
+    entitlements:
+      path: Widgets/SeventyFiveWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.peterbroas.seventyfive
+        com.apple.developer.icloud-container-identifiers:
+          - iCloud.com.peterbroas.seventyfive
+        com.apple.developer.icloud-services: [CloudKit]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.peterbroas.seventyfive.widgets
+        PROVISIONING_PROFILE_SPECIFIER: match AppStore com.peterbroas.seventyfive.widgets
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Apple Distribution
+        DEVELOPMENT_TEAM: GN2K85HBR8
+        TARGETED_DEVICE_FAMILY: 1
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: 75 Hard
+        CFBundleName: 75 Hard Widgets
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+schemes:
+  SeventyFive:
+    build:
+      targets:
+        SeventyFive: all
+    archive:
+      config: Release

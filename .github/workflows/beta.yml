@@ -1,0 +1,56 @@
+name: beta
+# Manual only.
+on:
+  workflow_dispatch:
+    inputs:
+      regenerate_profiles:
+        description: Rebuild signing profiles after a capability change
+        type: boolean
+        default: false
+concurrency:
+  group: beta
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode 26
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+      - uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.MATCH_DEPLOY_KEY }}
+      - run: ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - run: which fastlane || brew install fastlane
+      - run: fastlane beta
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_FORCE: ${{ inputs.regenerate_profiles && '1' || '0' }}
+      - name: Show signed entitlements
+        if: always()
+        run: |
+          IPA=$(ls *.ipa 2>/dev/null | head -1)
+          [ -n "$IPA" ] || { echo "no ipa"; exit 0; }
+          rm -rf ipa_check && mkdir ipa_check && unzip -q "$IPA" -d ipa_check
+          # Every extension must sit in PlugIns or Extensions. One at the top level means it was embedded wrong.
+          if ls -d ipa_check/Payload/*.app/*.appex 2>/dev/null; then echo "An extension is at the top of the app bundle"; exit 1; fi
+          for B in ipa_check/Payload/*.app ipa_check/Payload/*.app/PlugIns/*.appex ipa_check/Payload/*.app/Extensions/*.appex; do
+            [ -e "$B" ] || continue
+            echo "== $(basename "$B")"
+            codesign -d --entitlements - --xml "$B" 2>/dev/null | plutil -p - 2>/dev/null | grep -E "application-identifier|get-task-allow" || echo "   (no entitlements read)"
+            security cms -D -i "$B/embedded.mobileprovision" 2>/dev/null | plutil -extract Entitlements xml1 -o - - 2>/dev/null | grep -A1 "icloud" | tr -d '	' | paste -sd' ' - | sed 's/^/   profile: /'
+          done
+      - name: List frameworks inside the app
+        if: always()
+        run: |
+          IPA=$(ls *.ipa 2>/dev/null | head -1)
+          [ -n "$IPA" ] && unzip -l "$IPA" | grep -E "Frameworks/|PlugIns/[^/]+/$|\.bundle/$" | head -40 || echo "no ipa"
+

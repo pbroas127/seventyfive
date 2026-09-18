@@ -1,0 +1,32 @@
+default_platform(:ios)
+
+IDS = %w[com.peterbroas.seventyfive com.peterbroas.seventyfive.widgets].freeze
+
+platform :ios do
+  lane :beta do
+    setup_ci
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("ASC_KEY_ID"),
+      issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+      key_content: ENV.fetch("ASC_KEY_P8")
+    )
+    match(
+      type: "appstore",
+      api_key: api_key,
+      app_identifier: IDS,
+      readonly: false,
+      force: ENV["MATCH_FORCE"] == "1"
+    )
+    build_number = latest_testflight_build_number(api_key: api_key, app_identifier: IDS.first, initial_build_number: 0) + 1
+    gym(
+      project: "SeventyFive.xcodeproj",
+      scheme: "SeventyFive",
+      export_method: "app-store",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number}",
+      export_options: {
+        provisioningProfiles: IDS.to_h { |id| [id, "match AppStore #{id}"] }
+      }
+    )
+    pilot(api_key: api_key, skip_waiting_for_build_processing: true, distribute_external: false)
+  end
+end

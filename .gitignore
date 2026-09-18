@@ -1,0 +1,7 @@
+*.xcodeproj
+build/
+*.ipa
+*.dSYM.zip
+.DS_Store
+fastlane/report.xml
+.secrets/
