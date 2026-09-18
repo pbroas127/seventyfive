@@ -93,7 +93,7 @@ struct DayCell: View {
                 if record.complete {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .black)).foregroundStyle(model.accent.ink)
                 } else if past {
-                    Text("\(record.count)/7").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.muted)
+                    Text("\(record.count)/\(HardTask.all.count)").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.muted)
                 }
             }
             if record.hasPhoto {

@@ -300,7 +300,7 @@ private struct NudgeSection: View {
             } header: {
                 Text("End of day nudges")
             } footer: {
-                Text("Each nudge is written from the time of day and what you still have left. Once all seven are done, you get one last note and then quiet.")
+                Text("Each nudge is written from the time of day and what you still have left. Once all six are done, you get one last note and then quiet.")
             }
     }
 }

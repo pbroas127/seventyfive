@@ -9,7 +9,7 @@ struct TaskDetail {
     let action: () -> Void
 }
 
-/// The seven rows plus the progress picture, used on Home and in the calendar day view.
+/// The task rows plus the progress picture, used on Home and in the calendar day view.
 struct TaskList: View {
     @EnvironmentObject var model: AppModel
     let person: Snapshot

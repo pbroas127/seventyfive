@@ -149,7 +149,7 @@ struct DayCard: View {
                         .padding(.vertical, 10)
                         .background(accent.color, in: Capsule())
                 } else {
-                    Text("\(r.count) OF 7 DONE").foregroundStyle(cardText)
+                    Text("\(r.count) OF \(HardTask.all.count) DONE").foregroundStyle(cardText)
                 }
             }
             .font(.system(size: 15, weight: .heavy))

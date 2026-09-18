@@ -24,7 +24,6 @@ struct HardTask: Identifiable, Hashable {
         .init(id: "reading", title: "Read 10 pages", short: "Reading", icon: "books.vertical.fill", phrase: "your 10 pages"),
         .init(id: "water", title: "Drink one gallon of water", short: "Water", icon: "drop.fill", phrase: "your gallon of water"),
         .init(id: "diet", title: "Follow your diet", short: "Diet", icon: "fork.knife", phrase: "your diet"),
-        .init(id: "clean", title: "No cheat meals or alcohol", short: "No cheats", icon: "nosign", phrase: "no cheat meals or alcohol"),
     ]
 }
 
@@ -84,7 +83,6 @@ struct AppSettings: Codable, Equatable {
         "reading": .init(on: false, minutes: 21 * 60),
         "water": .init(on: false, minutes: 13 * 60),
         "diet": .init(on: false, minutes: 12 * 60),
-        "clean": .init(on: false, minutes: 19 * 60),
     ]
     /// One morning, one afternoon, one night.
     static let defaultNudges = [9 * 60, 15 * 60, 23 * 60]
@@ -299,11 +297,10 @@ enum Phrases {
         "reading": ["10 pages today 📚", "Grab your book. Ten pages.", "Readers are leaders 📚 Ten pages to go.", "Ten pages. Done before your coffee cools ☕", "Book time 📖"],
         "water": ["Drink up 💧 A gallon does not drink itself.", "Hydration check 💧", "Refill that bottle 🚰", "Keep chasing that gallon 💧", "Water break. Right now 💧"],
         "diet": ["Stick to the plan 🥗", "Eat like you mean it 🍽️", "Your diet is a promise to yourself 🥦", "Plan the next meal, then follow it 🥗", "Fuel, not filler 🍳"],
-        "clean": ["No cheat meals. No alcohol. No exceptions 🚫", "Say no to the cheat meal 🙅", "Stay clean today 🧊", "Future you says thanks for skipping it 🚫🍺", "Hold the line 🛡️"],
     ]
 
     static let done = ["One more down.", "Keep stacking.", "That is how it is done.", "Discipline looks good on you.", "Nice work.", "Check.", "Easy. Next."]
-    static let complete = ["Day {d} is in the books.", "Seven for seven.", "Another day stacked.", "You kept your word today.", "Nothing left on the list. Rest up."]
+    static let complete = ["Day {d} is in the books.", "Six for six.", "Another day stacked.", "You kept your word today.", "Nothing left on the list. Rest up."]
 
     static func fill(_ s: String, n: Int = 0, d: Int = 0) -> String {
         s.replacingOccurrences(of: "{n}", with: n == 1 ? "1 task" : "\(n) tasks").replacingOccurrences(of: "{d}", with: "\(d)")
@@ -314,7 +311,7 @@ enum Phrases {
 
 enum Reminders {
     /// Rebooks five days of local notifications. Called after every change, so today's reminders
-    /// skip anything already checked off and the end of day nudges stop once all seven are done.
+    /// skip anything already checked off and the end of day nudges stop once all six are done.
     static func reschedule(_ s: HardState) {
         let center = UNUserNotificationCenter.current()
         center.removeAllPendingNotificationRequests()
@@ -425,7 +422,7 @@ enum Nudges {
 
         if n == 0 {
             return (title, [
-                "All seven done. Great job, see you tomorrow ✅",
+                "All six done. Great job, see you tomorrow ✅",
                 "Day \(day) is in the books. Rest up, see you tomorrow 💪",
                 "Nothing left on the list. That is how it is done 🔥",
             ].randomElement()!)
@@ -438,9 +435,9 @@ enum Nudges {
         switch part {
         case .morning:
             pool = k == 0 ? [
-                "Good morning ☀️ Day \(day) starts now. Seven to go, let's get started.",
+                "Good morning ☀️ Day \(day) starts now. Six to go, let's get started.",
                 "Rise and grind ☀️ Nothing checked yet. Start with \(first).",
-                "Good morning. Clean slate today, all seven waiting. Let's go 💪",
+                "Good morning. Clean slate today, all six waiting. Let's go 💪",
             ] : [
                 "Good morning ☀️ You already have \(k) done. Keep it going.",
                 "Early start 🔥 \(doneText) done already. \(n) to go.",
@@ -449,7 +446,7 @@ enum Nudges {
         case .afternoon:
             var p = k == 0 ? [
                 "Half the day is gone and nothing is checked yet ⏳ Start with \(first).",
-                "Afternoon check in. All seven still open. Time to move 🏃",
+                "Afternoon check in. All six still open. Time to move 🏃",
             ] : [
                 "Afternoon check in ☀️ \(doneText) done. Still left: \(leftText).",
                 "Nice work so far. \(k) done, \(n) to go. Next: \(first).",

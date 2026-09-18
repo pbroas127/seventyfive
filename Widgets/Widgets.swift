@@ -96,11 +96,11 @@ struct HardWidgetView: View {
             dateLine
             Spacer()
             HStack(spacing: 3) {
-                ForEach(0..<7, id: \.self) { i in
+                ForEach(0..<HardTask.all.count, id: \.self) { i in
                     Capsule().fill(i < entry.record.count ? entry.accent.color : Theme.raised).frame(height: 5)
                 }
             }
-            Text(entry.record.complete ? "All complete" : "\(entry.record.count) of 7")
+            Text(entry.record.complete ? "All complete" : "\(entry.record.count) of \(HardTask.all.count)")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(entry.record.complete ? entry.accent.color : Theme.muted)
                 .padding(.top, 6)
@@ -114,7 +114,7 @@ struct HardWidgetView: View {
                 Spacer()
                 dayTitle
                 dateLine
-                Text(entry.record.complete ? "All complete" : "\(entry.record.count) of 7")
+                Text(entry.record.complete ? "All complete" : "\(entry.record.count) of \(HardTask.all.count)")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(entry.record.complete ? entry.accent.color : Theme.muted)
                     .padding(.top, 4)
@@ -138,7 +138,7 @@ struct HardWidgetView: View {
             HStack {
                 dateLine
                 Spacer()
-                Text(entry.record.complete ? "All complete" : "\(entry.record.count) of 7")
+                Text(entry.record.complete ? "All complete" : "\(entry.record.count) of \(HardTask.all.count)")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(entry.record.complete ? entry.accent.color : Theme.muted)
             }
@@ -201,10 +201,10 @@ struct HardWidgetView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text("DAY \(entry.day)")
                 .font(.system(size: 20, weight: .black)).italic().fontWidth(.condensed)
-            Text(entry.record.complete ? "All complete" : "\(entry.record.count) of 7 done")
+            Text(entry.record.complete ? "All complete" : "\(entry.record.count) of \(HardTask.all.count) done")
                 .font(.system(size: 13, weight: .semibold))
             HStack(spacing: 2) {
-                ForEach(0..<7, id: \.self) { i in
+                ForEach(0..<HardTask.all.count, id: \.self) { i in
                     Capsule().fill(i < entry.record.count ? Color.primary : Color.primary.opacity(0.25)).frame(height: 4)
                 }
             }
@@ -213,7 +213,7 @@ struct HardWidgetView: View {
     }
 
     private var circular: some View {
-        Gauge(value: Double(entry.record.count), in: 0...7) {
+        Gauge(value: Double(entry.record.count), in: 0...Double(HardTask.all.count)) {
             Text("DAY")
         } currentValueLabel: {
             Text("\(entry.day)").font(.system(size: 18, weight: .black)).fontWidth(.condensed)

@@ -60,7 +60,7 @@ struct HomeView: View {
                 if person.isMe { missedBanner.padding(.top, 18) }
 
                 if waiting > 0 {
-                    Text("Your seven every day")
+                    Text("Your six every day")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Theme.muted)
                         .padding(.top, 28)

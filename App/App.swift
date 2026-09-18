@@ -419,7 +419,7 @@ struct OnboardingView: View {
                 .italic()
                 .fontWidth(.condensed)
                 .foregroundStyle(Theme.text)
-            Text("Seven tasks. Every day. No days off.")
+            Text("Six tasks. Every day. No days off.")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(Theme.muted)
                 .padding(.bottom, 24)
