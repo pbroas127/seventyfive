@@ -169,10 +169,11 @@ struct HardState: Codable, Equatable {
     @discardableResult
     mutating func addWater(_ oz: Int, day n: Int) -> Bool {
         var reached = false
+        let goal = settings.waterGoal
         editDay(n) {
             let before = $0.waterOz
             $0.waterOz = max(0, $0.waterOz + oz)
-            if before < settings.waterGoal, $0.waterOz >= settings.waterGoal, !$0.done.contains("water") {
+            if before < goal, $0.waterOz >= goal, !$0.done.contains("water") {
                 $0.done.insert("water")
                 reached = true
             }
