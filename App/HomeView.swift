@@ -76,14 +76,7 @@ struct HomeView: View {
                         .padding(.top, 22)
                         .padding(.bottom, 14)
 
-                    VStack(spacing: 10) {
-                        ForEach(HardTask.all) { task in
-                            TaskRow(task: task, done: record.done.contains(task.id), editable: person.isMe) {
-                                withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { model.toggle(task, day: day) }
-                            }
-                        }
-                        PhotoRow(person: person, day: day)
-                    }
+                    TaskList(person: person, day: day)
 
                     NoteCard(person: person, day: day)
                         .padding(.top, 22)
@@ -302,10 +295,12 @@ struct TaskRow: View {
     let task: HardTask
     let done: Bool
     let editable: Bool
+    var detail: TaskDetail? = nil
     let action: () -> Void
     @State private var sweep: CGFloat = 0
 
     var body: some View {
+        HStack(spacing: 0) {
         Button(action: action) {
             HStack(spacing: 14) {
                 CheckCircle(done: done)
@@ -320,7 +315,7 @@ struct TaskRow: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 6)
-                if done {
+                if done && detail == nil {
                     Text("COMPLETE")
                         .font(.system(size: 11, weight: .heavy))
                         .tracking(1.1)
@@ -328,9 +323,20 @@ struct TaskRow: View {
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.leading, 16)
+            .padding(.trailing, detail == nil ? 16 : 8)
             .padding(.vertical, 12)
             .frame(minHeight: 64)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressStyle())
+        .allowsHitTesting(editable)
+        if let detail {
+            Button(action: detail.action) { DetailPill(detail: detail) }
+                .buttonStyle(PressStyle())
+                .padding(.trailing, 12)
+        }
+        }
             .background {
                 ZStack(alignment: .leading) {
                     Theme.surface
@@ -343,10 +349,6 @@ struct TaskRow: View {
             }
             .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.line))
             .opacity(done ? 0.62 : 1)
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-        .buttonStyle(PressStyle())
-        .allowsHitTesting(editable)
         .onAppear { sweep = done ? 1 : 0 }
         .onChange(of: done) { _, d in
             withAnimation(.easeOut(duration: d ? 0.55 : 0.3)) { sweep = d ? 1 : 0 }

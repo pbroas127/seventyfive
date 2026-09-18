@@ -172,6 +172,9 @@ struct HardWidgetView: View {
                     .foregroundStyle(done ? Theme.muted : Theme.text)
                     .lineLimit(1)
                 Spacer(minLength: 0)
+                if !compact, let extra = extra(task) {
+                    Text(extra).font(.system(size: 12, weight: .bold)).monospacedDigit().foregroundStyle(Theme.muted)
+                }
             }
             .frame(maxWidth: .infinity, minHeight: compact ? 16 : 34)
             .padding(.horizontal, compact ? 0 : 12)
@@ -183,6 +186,15 @@ struct HardWidgetView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func extra(_ task: HardTask) -> String? {
+        let r = entry.record
+        switch task.id {
+        case "water": return r.waterOz > 0 ? "\(r.waterOz) oz" : nil
+        case "diet": return r.kcal > 0 ? "\(r.kcal) cal" : nil
+        default: return nil
+        }
     }
 
     private var rectangular: some View {

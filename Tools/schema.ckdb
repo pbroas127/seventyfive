@@ -9,6 +9,7 @@ DEFINE SCHEMA
         "___recordID"   REFERENCE QUERYABLE,
         dayKey          STRING,
         done            STRING,
+        food            STRING,
         hasPhoto        INT64,
         note            STRING,
         photo           ASSET,

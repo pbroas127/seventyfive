@@ -114,6 +114,37 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func addWater(_ oz: Int, day: Int) {
+        let wasComplete = s.day(day).complete
+        var reached = false
+        update { reached = $0.addWater(oz, day: day) }
+        UIImpactFeedbackGenerator(style: oz > 0 ? .medium : .light).impactOccurred()
+        guard reached else { return }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        if s.day(day).complete && !wasComplete { celebrateDay = day } else { show("Gallon done 💧 Water checked off.") }
+    }
+
+    func addFood(_ e: FoodEntry, day: Int) {
+        update { $0.editDay(day) { $0.food.append(e) } }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        show("\(e.name) added, \(e.kcal) cal")
+    }
+
+    func removeFood(_ id: UUID, day: Int) {
+        update { $0.editDay(day) { $0.food.removeAll { $0.id == id } } }
+    }
+
+    func toggleFavorite(_ e: FoodEntry) {
+        update { s in
+            if let i = s.favorites.firstIndex(where: { $0.name.lowercased() == e.name.lowercased() }) {
+                s.favorites.remove(at: i)
+            } else {
+                s.favorites.insert(e, at: 0)
+            }
+        }
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
     func setNote(_ text: String, day: Int) {
         guard s.day(day).note != text else { return }
         update { $0.editDay(day) { $0.note = text } }

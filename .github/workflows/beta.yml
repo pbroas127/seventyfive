@@ -33,6 +33,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          USDA_KEY: ${{ secrets.USDA_KEY }}
           MATCH_FORCE: ${{ inputs.regenerate_profiles && '1' || '0' }}
       - name: Show signed entitlements
         if: always()

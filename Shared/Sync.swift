@@ -72,6 +72,8 @@ enum Sync {
         r["note"] = d.note as CKRecordValue
         r["hasPhoto"] = (d.hasPhoto ? 1 : 0) as CKRecordValue
         r["dayKey"] = DayMath.key(DayMath.date(day: n, startKey: s.startKey)) as CKRecordValue
+        let food = FoodSync(e: d.food, w: d.waterOz, s: s.settings.shareFood, g: [s.settings.calorieGoal, s.settings.proteinGoal, s.settings.waterGoal])
+        r["food"] = (String(data: (try? JSONEncoder().encode(food)) ?? Data(), encoding: .utf8) ?? "") as CKRecordValue
         let photo = HardStore.photoURL(owner: "me", attempt: s.attemptID, day: n)
         r["photo"] = d.hasPhoto && FileManager.default.fileExists(atPath: photo.path) ? CKAsset(fileURL: photo) : nil
         return r
@@ -99,12 +101,19 @@ enum Sync {
     static func fetchDays(_ code: String, attempt: String, upTo n: Int) async throws -> [Int: DayRecord] {
         guard n >= 1 else { return [:] }
         let ids = (1...min(n, Hard.days)).map { dayID(code, attempt, $0) }
-        let results = try await db.records(for: ids, desiredKeys: ["done", "note", "hasPhoto"])
+        let results = try await db.records(for: ids, desiredKeys: ["done", "note", "hasPhoto", "food"])
         var out: [Int: DayRecord] = [:]
         for (i, id) in ids.enumerated() {
             guard case .success(let r)? = results[id] else { continue }
             let done = (r["done"] as? String ?? "").split(separator: ",").map(String.init)
-            out[i + 1] = DayRecord(done: Set(done), note: r["note"] as? String ?? "", hasPhoto: (r["hasPhoto"] as? Int64 ?? 0) == 1)
+            var d = DayRecord(done: Set(done), note: r["note"] as? String ?? "", hasPhoto: (r["hasPhoto"] as? Int64 ?? 0) == 1)
+            if let json = (r["food"] as? String)?.data(using: .utf8), let f = try? JSONDecoder().decode(FoodSync.self, from: json) {
+                d.food = f.e
+                d.waterOz = f.w
+                d.foodShared = f.s
+                d.goals = f.g
+            }
+            out[i + 1] = d
         }
         return out
     }

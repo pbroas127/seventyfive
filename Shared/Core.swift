@@ -34,9 +34,15 @@ struct DayRecord: Codable, Equatable {
     var done: Set<String> = []
     var note = ""
     var hasPhoto = false
+    var food: [FoodEntry] = []
+    var waterOz = 0
+    var foodShared = true    // a friend's own choice, read from their record
+    var goals: [Int]?        // a friend's calorie, protein, water goals
 
     var count: Int { HardTask.all.filter { done.contains($0.id) }.count }
     var complete: Bool { count == HardTask.all.count }
+    var kcal: Int { food.reduce(0) { $0 + $1.kcal } }
+    var protein: Int { Int(food.reduce(0) { $0 + $1.protein }.rounded()) }
 
     init(done: Set<String> = [], note: String = "", hasPhoto: Bool = false) {
         self.done = done; self.note = note; self.hasPhoto = hasPhoto
@@ -46,6 +52,9 @@ struct DayRecord: Codable, Equatable {
         done = (try? c.decodeIfPresent(Set<String>.self, forKey: .done)) ?? []
         note = (try? c.decodeIfPresent(String.self, forKey: .note)) ?? ""
         hasPhoto = (try? c.decodeIfPresent(Bool.self, forKey: .hasPhoto)) ?? false
+        food = (try? c.decodeIfPresent([FoodEntry].self, forKey: .food)) ?? []
+        waterOz = (try? c.decodeIfPresent(Int.self, forKey: .waterOz)) ?? 0
+        foodShared = (try? c.decodeIfPresent(Bool.self, forKey: .foodShared)) ?? true
     }
 }
 
@@ -62,6 +71,10 @@ struct AppSettings: Codable, Equatable {
     var reminders: [String: Reminder] = AppSettings.defaultReminders
     var nudges: [Int] = AppSettings.defaultNudges
     var version = AppSettings.currentVersion
+    var calorieGoal = 2000
+    var proteinGoal = 150
+    var waterGoal = 128      // ounces, one gallon
+    var shareFood = true
 
     /// Task reminders start empty; the user turns on the ones they want.
     static let defaultReminders: [String: Reminder] = [
@@ -89,6 +102,10 @@ struct AppSettings: Codable, Equatable {
         reminders = (try? c.decodeIfPresent([String: Reminder].self, forKey: .reminders)) ?? base.reminders
         nudges = (try? c.decodeIfPresent([Int].self, forKey: .nudges)) ?? base.nudges
         version = (try? c.decodeIfPresent(Int.self, forKey: .version)) ?? 1
+        calorieGoal = (try? c.decodeIfPresent(Int.self, forKey: .calorieGoal)) ?? base.calorieGoal
+        proteinGoal = (try? c.decodeIfPresent(Int.self, forKey: .proteinGoal)) ?? base.proteinGoal
+        waterGoal = (try? c.decodeIfPresent(Int.self, forKey: .waterGoal)) ?? base.waterGoal
+        shareFood = (try? c.decodeIfPresent(Bool.self, forKey: .shareFood)) ?? base.shareFood
         // Build 1 shipped with two task reminders on and three evening nudges. Reset those once.
         if version < 2 {
             reminders = AppSettings.defaultReminders
@@ -111,6 +128,7 @@ struct HardState: Codable, Equatable {
     var friendCode = ""
     var dismissedMiss = ""
     var settings = AppSettings()
+    var favorites: [FoodEntry] = []
 
     init() {}
     init(from d: Decoder) throws {
@@ -128,6 +146,7 @@ struct HardState: Codable, Equatable {
         friendCode = (try? c.decodeIfPresent(String.self, forKey: .friendCode)) ?? b.friendCode
         dismissedMiss = (try? c.decodeIfPresent(String.self, forKey: .dismissedMiss)) ?? b.dismissedMiss
         settings = (try? c.decodeIfPresent(AppSettings.self, forKey: .settings)) ?? b.settings
+        favorites = (try? c.decodeIfPresent([FoodEntry].self, forKey: .favorites)) ?? b.favorites
     }
 
     func day(_ n: Int) -> DayRecord { days[String(n)] ?? DayRecord() }
@@ -143,6 +162,32 @@ struct HardState: Codable, Equatable {
         if r.done.contains(task) { r.done.remove(task) } else { r.done.insert(task) }
         days[String(day)] = r
         dirtyDays.insert(day)
+    }
+
+    /// Adds (or with a negative number removes) water. Reaching the goal checks the task off.
+    /// Returns true when this change is what completed the gallon.
+    @discardableResult
+    mutating func addWater(_ oz: Int, day n: Int) -> Bool {
+        var reached = false
+        editDay(n) {
+            let before = $0.waterOz
+            $0.waterOz = max(0, $0.waterOz + oz)
+            if before < settings.waterGoal, $0.waterOz >= settings.waterGoal, !$0.done.contains("water") {
+                $0.done.insert("water")
+                reached = true
+            }
+        }
+        return reached
+    }
+
+    /// Foods eaten in the last two weeks, newest first, one per name.
+    var recentFoods: [FoodEntry] {
+        var seen = Set<String>()
+        var out: [FoodEntry] = []
+        for n in intDays.keys.sorted(by: >).prefix(14) {
+            for e in day(n).food.reversed() where seen.insert(e.name.lowercased()).inserted { out.append(e) }
+        }
+        return out
     }
 
     mutating func editDay(_ n: Int, _ f: (inout DayRecord) -> Void) {
@@ -302,7 +347,7 @@ enum Reminders {
                     congratulated = true
                 }
                 let hoursLeft = max(0, Int(DayMath.dayEndDate(for: day, dayEnd: s.settings.dayEnd).timeIntervalSince(at) / 3600))
-                let text = Nudges.text(minutes: m, record: record, day: n, hoursLeft: hoursLeft)
+                let text = Nudges.text(minutes: m, record: record, day: n, hoursLeft: hoursLeft, calorieGoal: s.settings.calorieGoal)
                 add(center, id: "nudge.\(m).\(n)", title: text.title, body: text.body, at: at, day: n)
             }
         }
@@ -363,7 +408,7 @@ enum Nudges {
         }
     }
 
-    static func text(minutes: Int, record: DayRecord, day: Int, hoursLeft: Int) -> (title: String, body: String) {
+    static func text(minutes: Int, record: DayRecord, day: Int, hoursLeft: Int, calorieGoal: Int = 0) -> (title: String, body: String) {
         let part = DayPart(minutes: minutes)
         let left = HardTask.all.filter { !record.done.contains($0.id) }
         let done = HardTask.all.filter { record.done.contains($0.id) }
@@ -384,6 +429,9 @@ enum Nudges {
         }
 
         let pool: [String]
+        let calsLeft = calorieGoal - record.kcal
+        let foodLine: [String] = record.food.isEmpty || calorieGoal == 0 || record.done.contains("diet") ? [] :
+            calsLeft >= 0 ? ["\(calsLeft) calories left today 🍽️ Still to do: \(leftText)."] : ["You are \(-calsLeft) calories over today. Still to do: \(leftText)."]
         switch part {
         case .morning:
             pool = k == 0 ? [
@@ -406,7 +454,7 @@ enum Nudges {
             ]
             if left.contains(where: { $0.id == "diet" }) { p.append("Lunch time 🥗 Stick to your diet. Still left: \(leftText).") }
             if left.contains(where: { $0.id == "water" }) { p.append("Refill that bottle 💧 Still left: \(leftText).") }
-            pool = p
+            pool = p + foodLine
         case .evening:
             pool = n <= 2 ? [
                 "Almost there 🔥 Just \(leftText) left.",
@@ -415,7 +463,7 @@ enum Nudges {
                 "Evening check in 🌆 \(n) left: \(leftText).",
                 "Knock these out before it gets late: \(leftText) ⏳",
                 "\(k) done, \(n) to go. Get \(first) out of the way next.",
-            ]
+            ] + foodLine
         case .night:
             pool = [
                 "It's getting late 🌙 Only \(hours) left and you still need \(leftText).",

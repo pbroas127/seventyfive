@@ -22,7 +22,7 @@ platform :ios do
       project: "SeventyFive.xcodeproj",
       scheme: "SeventyFive",
       export_method: "app-store",
-      xcargs: "CURRENT_PROJECT_VERSION=#{build_number}",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build_number} USDA_KEY=#{ENV.fetch('USDA_KEY', '')}",
       export_options: {
         provisioningProfiles: IDS.to_h { |id| [id, "match AppStore #{id}"] }
       }

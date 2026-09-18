@@ -132,14 +132,7 @@ struct DayDetail: View {
                 ProgressStrip(count: record.count)
                     .padding(.vertical, 20)
 
-                VStack(spacing: 10) {
-                    ForEach(HardTask.all) { task in
-                        TaskRow(task: task, done: record.done.contains(task.id), editable: isMe) {
-                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { model.toggle(task, day: day) }
-                        }
-                    }
-                    PhotoRow(person: person, day: day)
-                }
+                TaskList(person: person, day: day)
 
                 NoteCard(person: person, day: day)
                     .padding(.top, 16)

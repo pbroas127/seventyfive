@@ -17,6 +17,7 @@ struct SettingsView: View {
                     look
                     reminders
                     if model.s.settings.notifications { NudgeSection() }
+                    food
                     challenge
                     friend
                     account
@@ -127,6 +128,37 @@ struct SettingsView: View {
             Text("Turn on a reminder for any task you want. They skip anything already checked off.")
         }
         .animation(.smooth, value: model.s.settings.notifications)
+    }
+
+    private var food: some View {
+        Section {
+            numberRow("Calories", model.binding(\.settings.calorieGoal), unit: "cal")
+            numberRow("Protein", model.binding(\.settings.proteinGoal), unit: "g")
+            Stepper(value: model.binding(\.settings.waterGoal), in: 32...256, step: 8) {
+                HStack {
+                    Text("Water")
+                    Spacer()
+                    Text("\(model.s.settings.waterGoal) oz").foregroundStyle(Theme.muted).monospacedDigit()
+                }
+            }
+            Toggle("Show my food to my friend", isOn: model.binding(\.settings.shareFood))
+        } header: {
+            Text("Daily goals")
+        } footer: {
+            Text("Hitting your water goal checks off the gallon for you. Your diet stays your call to check.")
+        }
+    }
+
+    private func numberRow(_ label: String, _ value: Binding<Int>, unit: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            TextField(label, value: value, format: .number)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 90)
+            Text(unit).foregroundStyle(Theme.muted)
+        }
     }
 
     private var challenge: some View {
