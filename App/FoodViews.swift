@@ -217,6 +217,10 @@ struct FoodLogView: View {
                                     Text(e.name).font(.system(size: 16, weight: .semibold)).lineLimit(2)
                                     Text([e.amount, "\(Int(e.protein.rounded())) g protein"].filter { !$0.isEmpty }.joined(separator: ", "))
                                         .font(.system(size: 13)).foregroundStyle(Theme.muted)
+                                    if let parts = e.parts, !parts.isEmpty {
+                                        Text(parts.map(\.name).joined(separator: ", "))
+                                            .font(.system(size: 12)).foregroundStyle(Theme.muted).lineLimit(2)
+                                    }
                                 }
                                 Spacer()
                                 Text("\(e.kcal)").font(.system(size: 16, weight: .bold)).monospacedDigit()
@@ -280,8 +284,20 @@ struct AddFoodSheet: View {
     @Environment(\.dismiss) private var dismiss
     let day: Int
     @State var meal: Meal
+    /// Set when picking items for a meal you are building, instead of logging them.
+    var collect: ((FoodEntry) -> Void)? = nil
     @State private var tab = 0
     @State private var path: [FoodResult] = []
+
+    private func add(_ e: FoodEntry, close: Bool) {
+        if let collect {
+            collect(e)
+            model.show("\(e.name) added to meal")
+        } else {
+            model.addFood(e, day: day)
+        }
+        if close { dismiss() }
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -289,7 +305,7 @@ struct AddFoodSheet: View {
                 Picker("Add by", selection: $tab) {
                     Text("Search").tag(0)
                     Text("Scan").tag(1)
-                    Text("Recent").tag(2)
+                    Text("Saved").tag(2)
                     Text("Quick").tag(3)
                 }
                 .pickerStyle(.segmented)
@@ -299,25 +315,27 @@ struct AddFoodSheet: View {
                 switch tab {
                 case 0: SearchFoodView { path.append($0) }
                 case 1: ScanFoodView { path.append($0) }
-                case 2: RecentFoodView(day: day, meal: meal)
-                default: QuickAddView(day: day, meal: meal) { dismiss() }
+                case 2: RecentFoodView(day: day, meal: meal, canBuild: collect == nil) { add($0, close: false) }
+                default: QuickAddView(meal: meal, buttonTitle: collect == nil ? "Add to \(meal.name)" : "Add to meal") { add($0, close: true) }
                 }
             }
             .background(Theme.bg.ignoresSafeArea())
-            .navigationTitle("Add to \(meal.name)")
+            .navigationTitle(collect == nil ? "Add to \(meal.name)" : "Add to meal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
+                    if collect == nil {
                     Menu {
                         Picker("Meal", selection: $meal) {
                             ForEach(Meal.allCases) { Label($0.name, systemImage: $0.icon).tag($0) }
                         }
                     } label: { Image(systemName: meal.icon) }
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() }.fontWeight(.semibold) }
             }
             .navigationDestination(for: FoodResult.self) { r in
-                FoodAmountView(result: r, day: day, meal: meal) { dismiss() }
+                FoodAmountView(result: r, buttonTitle: collect == nil ? "Add to \(meal.name)" : "Add to meal", meal: meal) { add($0, close: true) }
             }
             .overlay(alignment: .top) { ToastView() }
         }
@@ -416,9 +434,9 @@ struct ResultRow: View {
 struct FoodAmountView: View {
     @EnvironmentObject var model: AppModel
     let result: FoodResult
-    let day: Int
+    let buttonTitle: String
     let meal: Meal
-    var onDone: () -> Void
+    var onAdd: (FoodEntry) -> Void
     @State private var bySingle = true
     @State private var servings = 1.0
     @State private var grams = 100.0
@@ -462,10 +480,9 @@ struct FoodAmountView: View {
                 }
                 Button {
                     let amount = hasServing && bySingle ? "\(servings.formatted()) \(servings == 1 ? "serving" : "servings")" : "\(Int(grams)) g"
-                    model.addFood(FoodEntry(name: result.name, kcal: kcal, protein: protein, meal: meal.rawValue, amount: amount), day: day)
-                    onDone()
+                    onAdd(FoodEntry(name: result.name, kcal: kcal, protein: protein, meal: meal.rawValue, amount: amount))
                 } label: {
-                    Text("Add to \(meal.name)")
+                    Text(buttonTitle)
                         .font(.system(size: 17, weight: .bold))
                         .foregroundStyle(model.accent.ink)
                         .frame(maxWidth: .infinity, minHeight: 56)
@@ -582,37 +599,69 @@ struct RecentFoodView: View {
     @EnvironmentObject var model: AppModel
     let day: Int
     let meal: Meal
+    var canBuild = true
+    var onAdd: (FoodEntry) -> Void
+    @State private var building = false
+    @State private var editing: FoodEntry?
 
     var body: some View {
         let favorites = model.s.favorites
         let recents = model.s.recentFoods.filter { r in !favorites.contains { $0.name.lowercased() == r.name.lowercased() } }
-        if favorites.isEmpty && recents.isEmpty {
-            Text("Foods you log show up here, so the ones you eat all the time are one tap away.")
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.muted)
-                .multilineTextAlignment(.center)
-                .padding(32)
-                .frame(maxHeight: .infinity, alignment: .top)
-        } else {
-            List {
-                if !favorites.isEmpty {
-                    Section("Favorites") { ForEach(favorites) { row($0, favorite: true) } }
+        List {
+            Section {
+                if canBuild {
+                    Button { building = true } label: {
+                        Label("Create a meal", systemImage: "square.stack.3d.up.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                    }
+                    .listRowBackground(Theme.surface)
                 }
-                if !recents.isEmpty {
-                    Section("Recent") { ForEach(recents) { row($0, favorite: false) } }
+                ForEach(model.s.meals) { m in
+                    row(m, favorite: nil)
+                        .contextMenu {
+                            if canBuild { Button { editing = m } label: { Label("Edit meal", systemImage: "pencil") } }
+                            Button(role: .destructive) { model.deleteMeal(m.id) } label: { Label("Delete meal", systemImage: "trash") }
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) { model.deleteMeal(m.id) } label: { Label("Delete", systemImage: "trash") }
+                            if canBuild { Button { editing = m } label: { Label("Edit", systemImage: "pencil") }.tint(Theme.muted) }
+                        }
+                }
+            } header: {
+                Text("My meals")
+            } footer: {
+                if model.s.meals.isEmpty && canBuild {
+                    Text("Search or scan several foods and save them as one meal, like your usual breakfast.")
                 }
             }
-            .scrollContentBackground(.hidden)
+            if !favorites.isEmpty {
+                Section("Favorites") { ForEach(favorites) { row($0, favorite: true) } }
+            }
+            if !recents.isEmpty {
+                Section("Recent") { ForEach(recents) { row($0, favorite: false) } }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .sheet(isPresented: $building) {
+            NavigationStack { MealBuilderView(day: day, meal: meal) }.environmentObject(model)
+        }
+        .sheet(item: $editing) { m in
+            NavigationStack { MealBuilderView(day: day, meal: meal, existing: m) }.environmentObject(model)
         }
     }
 
-    private func row(_ e: FoodEntry, favorite: Bool) -> some View {
+    /// favorite is nil for saved meals, which have no star.
+    private func row(_ e: FoodEntry, favorite: Bool?) -> some View {
         HStack(spacing: 12) {
-            Button { model.toggleFavorite(e) } label: {
-                Image(systemName: favorite ? "star.fill" : "star")
-                    .foregroundStyle(favorite ? Color.yellow : Theme.muted)
+            if let favorite {
+                Button { model.toggleFavorite(e) } label: {
+                    Image(systemName: favorite ? "star.fill" : "star")
+                        .foregroundStyle(favorite ? Color.yellow : Theme.muted)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Image(systemName: "square.stack.3d.up.fill").foregroundStyle(model.accent.color)
             }
-            .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: 2) {
                 Text(e.name).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                 Text("\(e.kcal) cal, \(Int(e.protein.rounded())) g protein\(e.amount.isEmpty ? "" : ", \(e.amount)")")
@@ -620,7 +669,7 @@ struct RecentFoodView: View {
             }
             Spacer()
             Button {
-                model.addFood(e.copy(meal: meal.rawValue), day: day)
+                onAdd(e.copy(meal: meal.rawValue))
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 14, weight: .bold))
@@ -635,11 +684,147 @@ struct RecentFoodView: View {
     }
 }
 
-struct QuickAddView: View {
+/// Build one meal out of several foods, then save it to reuse with a single tap.
+struct MealBuilderView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.dismiss) private var dismiss
     let day: Int
     let meal: Meal
-    var onDone: () -> Void
+    var existing: FoodEntry? = nil
+    @State private var name = ""
+    @State private var items: [FoodEntry] = []
+    @State private var adding = false
+    @State private var loaded = false
+
+    var body: some View {
+        let kcal = items.reduce(0) { $0 + $1.kcal }
+        let protein = items.reduce(0.0) { $0 + $1.protein }
+
+        List {
+            Section {
+                TextField("Meal name, like Chicken rice bowl", text: $name)
+                    .font(.system(size: 17, weight: .semibold))
+            }
+            .listRowBackground(Theme.surface)
+
+            Section {
+                HStack(spacing: 12) {
+                    total("\(kcal)", "calories")
+                    total("\(Int(protein.rounded()))", "g protein")
+                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                ForEach(items) { e in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(e.name).font(.system(size: 15, weight: .semibold)).lineLimit(2)
+                            Text([e.amount, "\(Int(e.protein.rounded())) g protein"].filter { !$0.isEmpty }.joined(separator: ", "))
+                                .font(.system(size: 13)).foregroundStyle(Theme.muted)
+                        }
+                        Spacer()
+                        Text("\(e.kcal)").font(.system(size: 15, weight: .bold)).monospacedDigit()
+                    }
+                }
+                .onDelete { items.remove(atOffsets: $0) }
+                Button { adding = true } label: {
+                    Label(items.isEmpty ? "Add the first item" : "Add another item", systemImage: "plus.circle.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+            } header: {
+                Text(items.isEmpty ? "Items" : "Items (\(items.count))")
+            } footer: {
+                Text("Search, scan, or quick add each part. Swipe to remove one.")
+            }
+            .listRowBackground(Theme.surface)
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.bg.ignoresSafeArea())
+        .animation(.smooth(duration: 0.3), value: items)
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 10) {
+                Button {
+                    let e = built()
+                    model.saveMeal(e)
+                    model.addFood(e.copy(meal: meal.rawValue), day: day)
+                    dismiss()
+                } label: {
+                    Text("Save and add to \(meal.name)")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(model.accent.ink)
+                        .frame(maxWidth: .infinity, minHeight: 54)
+                        .background(model.accent.color, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                Button {
+                    model.saveMeal(built())
+                    dismiss()
+                } label: {
+                    Text("Save meal")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Theme.text)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Theme.raised, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+            }
+            .buttonStyle(PressStyle())
+            .disabled(items.isEmpty)
+            .opacity(items.isEmpty ? 0.4 : 1)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+            .background(Theme.bg)
+        }
+        .navigationTitle(existing == nil ? "New meal" : "Edit meal")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() } }
+        }
+        .overlay(alignment: .top) { ToastView() }
+        .sheet(isPresented: $adding) {
+            AddFoodSheet(day: day, meal: meal, collect: { items.append($0) }).environmentObject(model)
+        }
+        .onAppear {
+            guard !loaded else { return }
+            loaded = true
+            if let existing {
+                name = existing.name
+                items = existing.parts ?? []
+            }
+        }
+    }
+
+    private func built() -> FoodEntry {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        var e = FoodEntry(
+            name: trimmed.isEmpty ? "My meal" : trimmed,
+            kcal: items.reduce(0) { $0 + $1.kcal },
+            protein: items.reduce(0.0) { $0 + $1.protein },
+            meal: meal.rawValue,
+            amount: items.count == 1 ? "1 item" : "\(items.count) items"
+        )
+        e.parts = items
+        if let existing { e.id = existing.id }
+        return e
+    }
+
+    private func total(_ value: String, _ label: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.system(size: 36, weight: .black)).italic().fontWidth(.condensed).contentTransition(.numericText())
+            Text(label).font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.muted)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+}
+
+struct QuickAddView: View {
+    @EnvironmentObject var model: AppModel
+    let meal: Meal
+    let buttonTitle: String
+    var onAdd: (FoodEntry) -> Void
     @State private var name = ""
     @State private var kcal: Int?
     @State private var protein: Int?
@@ -659,10 +844,9 @@ struct QuickAddView: View {
                 }
             }
             Button {
-                model.addFood(FoodEntry(name: name.isEmpty ? "Quick add" : name, kcal: kcal ?? 0, protein: Double(protein ?? 0), meal: meal.rawValue), day: day)
-                onDone()
+                onAdd(FoodEntry(name: name.isEmpty ? "Quick add" : name, kcal: kcal ?? 0, protein: Double(protein ?? 0), meal: meal.rawValue))
             } label: {
-                Text("Add to \(meal.name)")
+                Text(buttonTitle)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(model.accent.ink)
                     .frame(maxWidth: .infinity, minHeight: 56)

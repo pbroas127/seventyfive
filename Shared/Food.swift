@@ -7,6 +7,7 @@ struct FoodEntry: Codable, Identifiable, Equatable, Hashable {
     var protein: Double      // grams
     var meal: Int = 0        // Meal raw value
     var amount = ""          // "150 g", "1 serving"
+    var parts: [FoodEntry]?  // set when this is a saved meal made of several foods
 
     init(name: String, kcal: Int, protein: Double, meal: Int = 0, amount: String = "") {
         self.name = name; self.kcal = kcal; self.protein = protein; self.meal = meal; self.amount = amount
@@ -19,10 +20,15 @@ struct FoodEntry: Codable, Identifiable, Equatable, Hashable {
         protein = (try? c.decodeIfPresent(Double.self, forKey: .protein)) ?? 0
         meal = (try? c.decodeIfPresent(Int.self, forKey: .meal)) ?? 0
         amount = (try? c.decodeIfPresent(String.self, forKey: .amount)) ?? ""
+        parts = try? c.decodeIfPresent([FoodEntry].self, forKey: .parts)
     }
 
     /// Same food, fresh id, for adding it again.
-    func copy(meal: Int) -> FoodEntry { FoodEntry(name: name, kcal: kcal, protein: protein, meal: meal, amount: amount) }
+    func copy(meal: Int) -> FoodEntry {
+        var e = FoodEntry(name: name, kcal: kcal, protein: protein, meal: meal, amount: amount)
+        e.parts = parts
+        return e
+    }
 }
 
 enum Meal: Int, CaseIterable, Identifiable {

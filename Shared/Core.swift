@@ -129,6 +129,7 @@ struct HardState: Codable, Equatable {
     var dismissedMiss = ""
     var settings = AppSettings()
     var favorites: [FoodEntry] = []
+    var meals: [FoodEntry] = []      // saved meals built from several foods
 
     init() {}
     init(from d: Decoder) throws {
@@ -147,6 +148,7 @@ struct HardState: Codable, Equatable {
         dismissedMiss = (try? c.decodeIfPresent(String.self, forKey: .dismissedMiss)) ?? b.dismissedMiss
         settings = (try? c.decodeIfPresent(AppSettings.self, forKey: .settings)) ?? b.settings
         favorites = (try? c.decodeIfPresent([FoodEntry].self, forKey: .favorites)) ?? b.favorites
+        meals = (try? c.decodeIfPresent([FoodEntry].self, forKey: .meals)) ?? b.meals
     }
 
     func day(_ n: Int) -> DayRecord { days[String(n)] ?? DayRecord() }

@@ -134,6 +134,17 @@ final class AppModel: ObservableObject {
         update { $0.editDay(day) { $0.food.removeAll { $0.id == id } } }
     }
 
+    func saveMeal(_ e: FoodEntry) {
+        update { s in
+            if let i = s.meals.firstIndex(where: { $0.id == e.id }) { s.meals[i] = e } else { s.meals.insert(e, at: 0) }
+        }
+        show("\(e.name) saved")
+    }
+
+    func deleteMeal(_ id: UUID) {
+        update { $0.meals.removeAll { $0.id == id } }
+    }
+
     func toggleFavorite(_ e: FoodEntry) {
         update { s in
             if let i = s.favorites.firstIndex(where: { $0.name.lowercased() == e.name.lowercased() }) {
