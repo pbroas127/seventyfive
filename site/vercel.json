@@ -1,0 +1,1 @@
+{ "rewrites": [ { "source": "/add", "destination": "/index.html" } ] }

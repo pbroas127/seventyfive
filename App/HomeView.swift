@@ -550,11 +550,9 @@ struct NoteCard: View {
                         }
                     }
                     .toolbar {
-                        if focused {
-                            ToolbarItemGroup(placement: .keyboard) {
-                                Spacer()
-                                Button("Done") { focused = false }.fontWeight(.semibold)
-                            }
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { focused = false }.fontWeight(.semibold)
                         }
                     }
             } else {
